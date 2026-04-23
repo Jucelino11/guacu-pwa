@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Guaçu Móveis">
+<meta name="theme-color" content="#1a472a">
+<link rel="manifest" href="manifest.json">
+<title>Guaçu Móveis — Orçamentos</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; color: #1a1a1a; min-height: 100vh; }
+
+  header {
+    background: #1a472a;
+    color: white;
+    padding: 16px 20px;
+    padding-top: calc(16px + env(safe-area-inset-top));
+    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .header-left h1 { font-size: 18px; font-weight: 700; }
+  .header-left span { font-size: 11px; opacity: 0.7; display: block; margin-top: 2px; }
+  .refresh-btn {
+    background: rgba(255,255,255,0.15);
+    border: none; color: white;
+    padding: 8px 12px; border-radius: 8px;
+    font-size: 18px; cursor: pointer;
+  }
+
+  .tabs { display: flex; background: white; border-bottom: 1px solid #e5e7eb; position: sticky; top: 73px; z-index: 9; }
+  .tab { flex: 1; padding: 13px 4px; text-align: center; font-size: 12px; font-weight: 600; color: #6b7280; cursor: pointer; border-bottom: 3px solid transparent; transition: all .2s; }
+  .tab.active { color: #1a472a; border-bottom-color: #1a472a; }
+  .badge-count { display: inline-block; background: #dc2626; color: white; border-radius: 10px; font-size: 10px; padding: 1px 5px; margin-left: 4px; vertical-align: middle; }
+
+  .content { padding: 16px; max-width: 480px; margin: 0 auto; padding-bottom: 30px; }
+
+  .card { background: white; border-radius: 14px; padding: 16px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.07); }
+  .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+  .numero { font-size: 17px; font-weight: 800; color: #1a472a; letter-spacing: .3px; }
+  .data-hora { font-size: 11px; color: #9ca3af; margin-top: 2px; }
+  .badge { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px; }
+  .badge-pendente  { background: #fef3c7; color: #92400e; }
+  .badge-aprovado  { background: #d1fae5; color: #065f46; }
+  .badge-reprovado { background: #fee2e2; color: #991b1b; }
+
+  .cliente-nome { font-size: 15px; font-weight: 700; }
+  .cliente-tel  { font-size: 12px; color: #6b7280; margin-top: 2px; margin-bottom: 12px; }
+
+  .itens { border-top: 1px solid #f3f4f6; padding-top: 10px; }
+  .item-row { display: flex; justify-content: space-between; align-items: flex-start; font-size: 13px; padding: 5px 0; border-bottom: 1px dashed #f3f4f6; }
+  .item-row:last-of-type { border-bottom: none; }
+  .item-info { flex: 1; }
+  .item-nome { color: #374151; font-weight: 500; }
+  .item-qtd  { font-size: 11px; color: #9ca3af; margin-top: 1px; }
+  .item-val  { color: #1a472a; font-weight: 700; white-space: nowrap; margin-left: 10px; }
+  .total-row { display: flex; justify-content: space-between; font-size: 16px; font-weight: 800; margin-top: 10px; padding-top: 10px; border-top: 2px solid #e5e7eb; }
+  .total-val { color: #1a472a; }
+
+  .actions { display: flex; gap: 10px; margin-top: 14px; }
+  .btn { flex: 1; padding: 13px; border: none; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; transition: transform .1s, opacity .2s; }
+  .btn:active { transform: scale(.97); }
+  .btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+  .btn-aprovar  { background: #16a34a; color: white; }
+  .btn-reprovar { background: #dc2626; color: white; }
+
+  .empty { text-align: center; padding: 60px 20px; color: #9ca3af; }
+  .empty-icon { font-size: 48px; margin-bottom: 12px; }
+  .empty p { font-size: 15px; }
+
+  .loading { text-align: center; padding: 50px 20px; }
+  .spinner { width: 36px; height: 36px; border: 3px solid #e5e7eb; border-top-color: #1a472a; border-radius: 50%; animation: spin .7s linear infinite; margin: 0 auto 12px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .toast {
+    position: fixed; bottom: calc(20px + env(safe-area-inset-bottom));
+    left: 50%; transform: translateX(-50%);
+    background: #1a1a1a; color: white;
+    padding: 12px 20px; border-radius: 10px;
+    font-size: 14px; font-weight: 500;
+    z-index: 100; opacity: 0;
+    transition: opacity .3s;
+    pointer-events: none;
+    white-space: nowrap;
+    box-shadow: 0 4px 16px rgba(0,0,0,.3);
+  }
+  .toast.show { opacity: 1; }
+
+  .install-banner {
+    background: #1a472a; color: white;
+    padding: 12px 16px; display: flex;
+    align-items: center; justify-content: space-between;
+    font-size: 13px; cursor: pointer;
+  }
+  .install-banner button {
+    background: white; color: #1a472a;
+    border: none; padding: 6px 12px;
+    border-radius: 6px; font-weight: 700;
+    font-size: 12px; cursor: pointer;
+  }
+  .install-banner .close-btn {
+    background: none; color: white;
+    border: none; font-size: 18px;
+    padding: 0 0 0 10px; cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<div id="install-banner" style="display:none" class="install-banner">
+  <span>📱 Instalar como app</span>
+  <div>
+    <button id="install-btn">Instalar</button>
+    <button class="close-btn" onclick="document.getElementById('install-banner').style.display='none'">×</button>
+  </div>
+</div>
+
+<header>
+  <div class="header-left">
+    <h1>🪑 Guaçu Móveis</h1>
+    <span id="last-update">Carregando...</span>
+  </div>
+  <button class="refresh-btn" onclick="loadAll()">↻</button>
+</header>
+
+<div class="tabs">
+  <div class="tab active" id="tab-pendente" onclick="switchTab('pendente')">⏳ Pendentes <span class="badge-count" id="cnt-pendente" style="display:none">0</span></div>
+  <div class="tab" id="tab-aprovado"  onclick="switchTab('aprovado')">✅ Aprovados</div>
+  <div class="tab" id="tab-reprovado" onclick="switchTab('reprovado')">❌ Reprovados</div>
+</div>
+
+<div class="content" id="content">
+  <div class="loading"><div class="spinner"></div><p style="color:#6b7280">Carregando...</p></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL  = 'https://bnqvcxwuqgbcvtvlpudt.supabase.co';
+const SUPABASE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJucXZjeHd1cWdiY3Z0dmxwdWR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5OTkzMjgsImV4cCI6MjA5MTU3NTMyOH0.e6AP3s1LTna1pcMxtS9AuPgElItmRJBlboUVoW6AHcY';
+const EVOLUTION_URL = 'http://evolution.testejk.store';
+const EVOLUTION_KEY = 'EF097AFB3511-465B-A40D-BCD9A955C317';
+const INSTANCE      = 'whats';
+const MARKUP        = 2.41;
+
+let currentTab = 'pendente';
+let allData    = { pendente: [], aprovado: [], reprovado: [] };
+let deferredPrompt = null;
+
+// PWA install prompt
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById('install-banner').style.display = 'flex';
+});
+document.getElementById('install-btn').onclick = async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  const { outcome } = await deferredPrompt.userChoice;
+  deferredPrompt = null;
+  document.getElementById('install-banner').style.display = 'none';
+  if (outcome === 'accepted') toast('✅ App instalado com sucesso!');
+};
+
+// Service Worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js');
+}
+
+async function sbFetch(path, opts = {}) {
+  const res = await fetch(SUPABASE_URL + path, {
+    ...opts,
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'Prefer': 'return=representation',
+      ...(opts.headers || {})
+    }
+  });
+  if (!res.ok) throw new Error(await res.text());
+  const text = await res.text();
+  return text ? JSON.parse(text) : [];
+}
+
+async function sendWA(number, text) {
+  await fetch(`${EVOLUTION_URL}/message/sendText/${INSTANCE}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'apikey': EVOLUTION_KEY },
+    body: JSON.stringify({ number, text })
+  });
+}
+
+async function loadAll() {
+  document.getElementById('last-update').textContent = 'Atualizando...';
+  try {
+    const data = await sbFetch(
+      '/rest/v1/orcamentos?status=in.(pendente,aprovado,reprovado)' +
+      '&select=*,clientes(nome,telefone),itens_orcamento(quantidade,preco_unitario,produtos(nome,codigo))' +
+      '&order=created_at.desc&limit=100'
+    );
+    allData = { pendente: [], aprovado: [], reprovado: [] };
+    (Array.isArray(data) ? data : []).forEach(o => {
+      if (allData[o.status]) allData[o.status].push(o);
+    });
+    const cnt = allData.pendente.length;
+    const badge = document.getElementById('cnt-pendente');
+    badge.textContent = cnt;
+    badge.style.display = cnt ? 'inline-block' : 'none';
+    document.getElementById('last-update').textContent = 'Atualizado às ' + new Date().toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
+    renderTab();
+  } catch(e) {
+    document.getElementById('last-update').textContent = '⚠️ Erro ao carregar';
+  }
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  ['pendente','aprovado','reprovado'].forEach(t => {
+    document.getElementById('tab-' + t).classList.toggle('active', t === tab);
+  });
+  renderTab();
+}
+
+function fmt(v)    { return 'R$ ' + Number(v).toFixed(2).replace('.', ','); }
+function fmtDt(d)  { return new Date(d).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }); }
+function calcTotal(itens) {
+  return itens.reduce((s, i) => s + parseFloat(i.preco_unitario) * MARKUP * parseInt(i.quantidade), 0);
+}
+
+function renderTab() {
+  const list = allData[currentTab] || [];
+  const el = document.getElementById('content');
+  if (!list.length) {
+    const msgs = { pendente: 'Nenhum orçamento pendente', aprovado: 'Nenhum aprovado ainda', reprovado: 'Nenhum reprovado' };
+    const icons = { pendente: '📋', aprovado: '✅', reprovado: '❌' };
+    el.innerHTML = `<div class="empty"><div class="empty-icon">${icons[currentTab]}</div><p>${msgs[currentTab]}</p></div>`;
+    return;
+  }
+  el.innerHTML = list.map(o => renderCard(o)).join('');
+}
+
+function renderCard(o) {
+  const itens  = o.itens_orcamento || [];
+  const nome   = o.clientes?.nome || 'Cliente';
+  const tel    = o.clientes?.telefone || '';
+  const total  = calcTotal(itens);
+
+  const itensHtml = itens.map(i => {
+    const p = parseFloat(i.preco_unitario) * MARKUP;
+    const s = p * parseInt(i.quantidade);
+    return `<div class="item-row">
+      <div class="item-info">
+        <div class="item-nome">${i.produtos?.nome || 'Produto'}</div>
+        <div class="item-qtd">Qtd: ${i.quantidade} × ${fmt(p)}</div>
+      </div>
+      <div class="item-val">${fmt(s)}</div>
+    </div>`;
+  }).join('');
+
+  const actions = currentTab === 'pendente' ? `
+    <div class="actions">
+      <button class="btn btn-aprovar"  onclick="aprovar('${o.id}','${o.numero_orcamento}','${tel}','${nome}',this)">✅ Aprovar</button>
+      <button class="btn btn-reprovar" onclick="reprovar('${o.id}','${o.numero_orcamento}','${tel}','${nome}',this)">❌ Reprovar</button>
+    </div>` : '';
+
+  return `<div class="card" id="card-${o.id}">
+    <div class="card-header">
+      <div>
+        <div class="numero">${o.numero_orcamento || o.id.substring(0,8)}</div>
+        <div class="data-hora">${fmtDt(o.created_at)}</div>
+      </div>
+      <span class="badge badge-${o.status}">${o.status}</span>
+    </div>
+    <div class="cliente-nome">${nome}</div>
+    <div class="cliente-tel">📱 ${tel}</div>
+    <div class="itens">
+      ${itensHtml}
+      <div class="total-row"><span>Total</span><span class="total-val">${fmt(total)}</span></div>
+    </div>
+    ${actions}
+  </div>`;
+}
+
+async function aprovar(id, numero, tel, nome, btn) {
+  const total = calcTotal((allData.pendente.find(x => x.id === id)?.itens_orcamento || []));
+  const btns = btn.parentElement.querySelectorAll('.btn');
+  btns.forEach(b => b.disabled = true);
+  btn.textContent = '⏳ Aprovando...';
+  try {
+    await sbFetch(`/rest/v1/orcamentos?id=eq.${id}&status=eq.pendente`, {
+      method: 'PATCH', body: JSON.stringify({ status: 'aprovado', total })
+    });
+    const o = allData.pendente.find(x => x.id === id);
+    const itens = o?.itens_orcamento || [];
+    const dt = new Date().toLocaleDateString('pt-BR');
+    const linhas = [
+      `*ORÇAMENTO ${numero}*`, '📋 *Guaçu Móveis*', `📅 ${dt}`, '',
+      `👤 *Cliente:* ${nome}`, '', '*ITENS DO PEDIDO:*', '─────────────────'
+    ];
+    itens.forEach(i => {
+      const p = parseFloat(i.preco_unitario) * MARKUP;
+      const s = p * parseInt(i.quantidade);
+      linhas.push(`• ${i.produtos?.nome} (${i.produtos?.codigo || ''})`);
+      linhas.push(`  ${i.quantidade}x ${fmt(p)} = *${fmt(s)}*`);
+    });
+    linhas.push('─────────────────');
+    linhas.push(`💰 *TOTAL: ${fmt(total)}*`);
+    linhas.push('', '⏱️ _Válido por 7 dias_', '_Guaçu Móveis_');
+    await sendWA(tel, linhas.join('\n'));
+    toast('✅ Aprovado! Orçamento enviado ao cliente.');
+    await loadAll();
+  } catch(e) {
+    toast('❌ Erro ao aprovar. Tente novamente.');
+    btns.forEach(b => b.disabled = false);
+    btn.textContent = '✅ Aprovar';
+  }
+}
+
+async function reprovar(id, numero, tel, nome, btn) {
+  if (!confirm(`Reprovar ${numero} de ${nome}?`)) return;
+  const btns = btn.parentElement.querySelectorAll('.btn');
+  btns.forEach(b => b.disabled = true);
+  btn.textContent = '⏳ Reprovando...';
+  try {
+    await sbFetch(`/rest/v1/orcamentos?id=eq.${id}&status=eq.pendente`, {
+      method: 'PATCH', body: JSON.stringify({ status: 'reprovado' })
+    });
+    await sendWA(tel, `Olá ${nome}! Infelizmente seu pedido não pôde ser aprovado desta vez. Entre em contato para mais informações.\n\n_Guaçu Móveis_`);
+    toast('Reprovado. Cliente notificado.');
+    await loadAll();
+  } catch(e) {
+    toast('❌ Erro ao reprovar.');
+    btns.forEach(b => b.disabled = false);
+    btn.textContent = '❌ Reprovar';
+  }
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+loadAll();
+setInterval(loadAll, 60000);
+</script>
+</body>
+</html>
