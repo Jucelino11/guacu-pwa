@@ -10,6 +10,7 @@
 <meta name="theme-color" content="#1a472a">
 <link rel="manifest" href="manifest.json">
 <title>Guaçu Móveis — Orçamentos</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; color: #1a1a1a; min-height: 100vh; }
@@ -24,11 +25,12 @@
   }
   .header-left h1 { font-size: 18px; font-weight: 700; }
   .header-left span { font-size: 11px; opacity: 0.7; display: block; margin-top: 2px; }
-  .refresh-btn {
+  .header-actions { display: flex; gap: 8px; }
+  .refresh-btn, .logout-btn {
     background: rgba(255,255,255,0.15);
     border: none; color: white;
     padding: 8px 12px; border-radius: 8px;
-    font-size: 18px; cursor: pointer;
+    font-size: 15px; cursor: pointer;
   }
 
   .tabs { display: flex; background: white; border-bottom: 1px solid #e5e7eb; position: sticky; top: 73px; z-index: 9; }
@@ -89,27 +91,30 @@
   }
   .toast.show { opacity: 1; }
 
-  #pin-screen {
+  #login-screen {
     position: fixed; inset: 0; background: #1a472a;
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
-    z-index: 999;
+    z-index: 999; padding: 32px 24px;
   }
-  #pin-screen h2 { color: white; font-size: 22px; margin-bottom: 8px; }
-  #pin-screen p  { color: rgba(255,255,255,.6); font-size: 13px; margin-bottom: 32px; }
-  #pin-dots { display: flex; gap: 14px; margin-bottom: 32px; }
-  .pin-dot { width: 16px; height: 16px; border-radius: 50%; background: rgba(255,255,255,.3); transition: background .15s; }
-  .pin-dot.filled { background: white; }
-  .pin-pad { display: grid; grid-template-columns: repeat(3, 72px); gap: 12px; }
-  .pin-key {
-    height: 72px; border-radius: 50%; border: none;
-    background: rgba(255,255,255,.15); color: white;
-    font-size: 22px; font-weight: 600; cursor: pointer;
-    transition: background .1s;
+  #login-screen h2 { color: white; font-size: 26px; font-weight: 800; margin-bottom: 6px; }
+  #login-screen .subtitle { color: rgba(255,255,255,.6); font-size: 13px; margin-bottom: 36px; }
+  .login-box { background: white; border-radius: 16px; padding: 24px; width: 100%; max-width: 340px; }
+  .login-box label { display: block; font-size: 12px; font-weight: 600; color: #6b7280; margin-bottom: 6px; }
+  .login-box input {
+    width: 100%; padding: 13px 14px; border: 1.5px solid #e5e7eb;
+    border-radius: 10px; font-size: 15px; margin-bottom: 14px;
+    outline: none; transition: border-color .2s;
   }
-  .pin-key:active { background: rgba(255,255,255,.35); }
-  .pin-key.del { font-size: 18px; }
-  #pin-error { color: #fca5a5; font-size: 13px; margin-top: 16px; min-height: 18px; }
+  .login-box input:focus { border-color: #1a472a; }
+  .login-box button {
+    width: 100%; padding: 14px; background: #1a472a;
+    color: white; border: none; border-radius: 10px;
+    font-size: 15px; font-weight: 700; cursor: pointer;
+    transition: opacity .2s;
+  }
+  .login-box button:disabled { opacity: .5; }
+  #login-error { color: #dc2626; font-size: 13px; margin-top: 12px; text-align: center; min-height: 18px; }
 
   .install-banner {
     background: #1a472a; color: white;
@@ -132,30 +137,17 @@
 </head>
 <body>
 
-<div id="pin-screen">
+<div id="login-screen">
   <h2>🪑 Guaçu Móveis</h2>
-  <p>Digite o PIN para acessar</p>
-  <div id="pin-dots">
-    <div class="pin-dot" id="d0"></div>
-    <div class="pin-dot" id="d1"></div>
-    <div class="pin-dot" id="d2"></div>
-    <div class="pin-dot" id="d3"></div>
+  <p class="subtitle">Acesso restrito — faça login para continuar</p>
+  <div class="login-box">
+    <label>E-mail</label>
+    <input type="email" id="login-email" placeholder="seu@email.com" autocomplete="email">
+    <label>Senha</label>
+    <input type="password" id="login-senha" placeholder="••••••••" autocomplete="current-password">
+    <button id="login-btn" onclick="doLogin()">Entrar</button>
+    <div id="login-error"></div>
   </div>
-  <div class="pin-pad">
-    <button class="pin-key" onclick="pinPress('1')">1</button>
-    <button class="pin-key" onclick="pinPress('2')">2</button>
-    <button class="pin-key" onclick="pinPress('3')">3</button>
-    <button class="pin-key" onclick="pinPress('4')">4</button>
-    <button class="pin-key" onclick="pinPress('5')">5</button>
-    <button class="pin-key" onclick="pinPress('6')">6</button>
-    <button class="pin-key" onclick="pinPress('7')">7</button>
-    <button class="pin-key" onclick="pinPress('8')">8</button>
-    <button class="pin-key" onclick="pinPress('9')">9</button>
-    <button class="pin-key" onclick="pinPress('')"></button>
-    <button class="pin-key" onclick="pinPress('0')">0</button>
-    <button class="pin-key del" onclick="pinDel()">⌫</button>
-  </div>
-  <div id="pin-error"></div>
 </div>
 
 <div id="install-banner" style="display:none" class="install-banner">
@@ -171,7 +163,10 @@
     <h1>🪑 Guaçu Móveis</h1>
     <span id="last-update">Carregando...</span>
   </div>
-  <button class="refresh-btn" onclick="loadAll()">↻</button>
+  <div class="header-actions">
+    <button class="refresh-btn" onclick="loadAll()">↻</button>
+    <button class="logout-btn" onclick="doLogout()" title="Sair">Sair</button>
+  </div>
 </header>
 
 <div class="tabs">
@@ -187,40 +182,6 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const PIN_CORRECT = '9510';
-let pinValue = '';
-
-function pinPress(d) {
-  if (!d || pinValue.length >= 4) return;
-  pinValue += d;
-  updateDots();
-  if (pinValue.length === 4) setTimeout(checkPin, 150);
-}
-function pinDel() {
-  pinValue = pinValue.slice(0, -1);
-  updateDots();
-  document.getElementById('pin-error').textContent = '';
-}
-function updateDots() {
-  for (let i = 0; i < 4; i++)
-    document.getElementById('d' + i).classList.toggle('filled', i < pinValue.length);
-}
-function checkPin() {
-  if (pinValue === PIN_CORRECT) {
-    sessionStorage.setItem('pin_ok', '1');
-    document.getElementById('pin-screen').style.display = 'none';
-    loadAll();
-  } else {
-    document.getElementById('pin-error').textContent = 'PIN incorreto. Tente novamente.';
-    pinValue = '';
-    updateDots();
-  }
-}
-
-if (sessionStorage.getItem('pin_ok') === '1') {
-  document.getElementById('pin-screen').style.display = 'none';
-}
-
 const SUPABASE_URL  = 'https://bnqvcxwuqgbcvtvlpudt.supabase.co';
 const SUPABASE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJucXZjeHd1cWdiY3Z0dmxwdWR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5OTkzMjgsImV4cCI6MjA5MTU3NTMyOH0.e6AP3s1LTna1pcMxtS9AuPgElItmRJBlboUVoW6AHcY';
 const EVOLUTION_URL = 'http://evolution.testejk.store';
@@ -228,9 +189,50 @@ const EVOLUTION_KEY = 'EF097AFB3511-465B-A40D-BCD9A955C317';
 const INSTANCE      = 'whats';
 const MARKUP        = 2.41;
 
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 let currentTab = 'pendente';
 let allData    = { pendente: [], aprovado: [], reprovado: [] };
 let deferredPrompt = null;
+let refreshInterval = null;
+
+// Auth
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const senha = document.getElementById('login-senha').value;
+  const btn   = document.getElementById('login-btn');
+  const err   = document.getElementById('login-error');
+  if (!email || !senha) { err.textContent = 'Preencha e-mail e senha.'; return; }
+  btn.disabled = true;
+  btn.textContent = 'Entrando...';
+  err.textContent = '';
+  const { error } = await sb.auth.signInWithPassword({ email, password: senha });
+  if (error) {
+    err.textContent = 'E-mail ou senha incorretos.';
+    btn.disabled = false;
+    btn.textContent = 'Entrar';
+  }
+}
+
+async function doLogout() {
+  await sb.auth.signOut();
+}
+
+sb.auth.onAuthStateChange((event, session) => {
+  if (session) {
+    document.getElementById('login-screen').style.display = 'none';
+    loadAll();
+    if (!refreshInterval) refreshInterval = setInterval(loadAll, 60000);
+  } else {
+    document.getElementById('login-screen').style.display = 'flex';
+    if (refreshInterval) { clearInterval(refreshInterval); refreshInterval = null; }
+  }
+});
+
+// Enter key no login
+document.getElementById('login-senha').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
 
 // PWA install prompt
 window.addEventListener('beforeinstallprompt', e => {
@@ -253,11 +255,13 @@ if ('serviceWorker' in navigator) {
 }
 
 async function sbFetch(path, opts = {}) {
+  const { data: { session } } = await sb.auth.getSession();
+  const token = session?.access_token || SUPABASE_KEY;
   const res = await fetch(SUPABASE_URL + path, {
     ...opts,
     headers: {
       'apikey': SUPABASE_KEY,
-      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'Authorization': 'Bearer ' + token,
       'Content-Type': 'application/json',
       'Accept': 'application/json',
       'Prefer': 'return=representation',
@@ -427,11 +431,6 @@ function toast(msg) {
   t.textContent = msg;
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 3000);
-}
-
-if (sessionStorage.getItem('pin_ok') === '1') {
-  loadAll();
-  setInterval(loadAll, 60000);
 }
 </script>
 </body>
