@@ -89,6 +89,28 @@
   }
   .toast.show { opacity: 1; }
 
+  #pin-screen {
+    position: fixed; inset: 0; background: #1a472a;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 999;
+  }
+  #pin-screen h2 { color: white; font-size: 22px; margin-bottom: 8px; }
+  #pin-screen p  { color: rgba(255,255,255,.6); font-size: 13px; margin-bottom: 32px; }
+  #pin-dots { display: flex; gap: 14px; margin-bottom: 32px; }
+  .pin-dot { width: 16px; height: 16px; border-radius: 50%; background: rgba(255,255,255,.3); transition: background .15s; }
+  .pin-dot.filled { background: white; }
+  .pin-pad { display: grid; grid-template-columns: repeat(3, 72px); gap: 12px; }
+  .pin-key {
+    height: 72px; border-radius: 50%; border: none;
+    background: rgba(255,255,255,.15); color: white;
+    font-size: 22px; font-weight: 600; cursor: pointer;
+    transition: background .1s;
+  }
+  .pin-key:active { background: rgba(255,255,255,.35); }
+  .pin-key.del { font-size: 18px; }
+  #pin-error { color: #fca5a5; font-size: 13px; margin-top: 16px; min-height: 18px; }
+
   .install-banner {
     background: #1a472a; color: white;
     padding: 12px 16px; display: flex;
@@ -109,6 +131,32 @@
 </style>
 </head>
 <body>
+
+<div id="pin-screen">
+  <h2>🪑 Guaçu Móveis</h2>
+  <p>Digite o PIN para acessar</p>
+  <div id="pin-dots">
+    <div class="pin-dot" id="d0"></div>
+    <div class="pin-dot" id="d1"></div>
+    <div class="pin-dot" id="d2"></div>
+    <div class="pin-dot" id="d3"></div>
+  </div>
+  <div class="pin-pad">
+    <button class="pin-key" onclick="pinPress('1')">1</button>
+    <button class="pin-key" onclick="pinPress('2')">2</button>
+    <button class="pin-key" onclick="pinPress('3')">3</button>
+    <button class="pin-key" onclick="pinPress('4')">4</button>
+    <button class="pin-key" onclick="pinPress('5')">5</button>
+    <button class="pin-key" onclick="pinPress('6')">6</button>
+    <button class="pin-key" onclick="pinPress('7')">7</button>
+    <button class="pin-key" onclick="pinPress('8')">8</button>
+    <button class="pin-key" onclick="pinPress('9')">9</button>
+    <button class="pin-key" onclick="pinPress('')"></button>
+    <button class="pin-key" onclick="pinPress('0')">0</button>
+    <button class="pin-key del" onclick="pinDel()">⌫</button>
+  </div>
+  <div id="pin-error"></div>
+</div>
 
 <div id="install-banner" style="display:none" class="install-banner">
   <span>📱 Instalar como app</span>
@@ -139,6 +187,40 @@
 <div class="toast" id="toast"></div>
 
 <script>
+const PIN_CORRECT = '9510';
+let pinValue = '';
+
+function pinPress(d) {
+  if (!d || pinValue.length >= 4) return;
+  pinValue += d;
+  updateDots();
+  if (pinValue.length === 4) setTimeout(checkPin, 150);
+}
+function pinDel() {
+  pinValue = pinValue.slice(0, -1);
+  updateDots();
+  document.getElementById('pin-error').textContent = '';
+}
+function updateDots() {
+  for (let i = 0; i < 4; i++)
+    document.getElementById('d' + i).classList.toggle('filled', i < pinValue.length);
+}
+function checkPin() {
+  if (pinValue === PIN_CORRECT) {
+    sessionStorage.setItem('pin_ok', '1');
+    document.getElementById('pin-screen').style.display = 'none';
+    loadAll();
+  } else {
+    document.getElementById('pin-error').textContent = 'PIN incorreto. Tente novamente.';
+    pinValue = '';
+    updateDots();
+  }
+}
+
+if (sessionStorage.getItem('pin_ok') === '1') {
+  document.getElementById('pin-screen').style.display = 'none';
+}
+
 const SUPABASE_URL  = 'https://bnqvcxwuqgbcvtvlpudt.supabase.co';
 const SUPABASE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJucXZjeHd1cWdiY3Z0dmxwdWR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5OTkzMjgsImV4cCI6MjA5MTU3NTMyOH0.e6AP3s1LTna1pcMxtS9AuPgElItmRJBlboUVoW6AHcY';
 const EVOLUTION_URL = 'http://evolution.testejk.store';
@@ -347,8 +429,10 @@ function toast(msg) {
   setTimeout(() => t.classList.remove('show'), 3000);
 }
 
-loadAll();
-setInterval(loadAll, 60000);
+if (sessionStorage.getItem('pin_ok') === '1') {
+  loadAll();
+  setInterval(loadAll, 60000);
+}
 </script>
 </body>
 </html>
