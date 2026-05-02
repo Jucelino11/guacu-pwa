@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://bnqvcxwuqgbcvtvlpudt.supabase.co https://evolution.testejk.store; manifest-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -57,6 +58,7 @@
   .item-row:last-of-type { border-bottom: none; }
   .item-info { flex: 1; }
   .item-nome { color: #374151; font-weight: 500; }
+  .item-acab { font-size: 11px; color: #1a472a; margin-top: 1px; }
   .item-qtd  { font-size: 11px; color: #9ca3af; margin-top: 1px; }
   .item-val  { color: #1a472a; font-weight: 700; white-space: nowrap; margin-left: 10px; }
   .total-row { display: flex; justify-content: space-between; font-size: 16px; font-weight: 800; margin-top: 10px; padding-top: 10px; border-top: 2px solid #e5e7eb; }
@@ -184,12 +186,12 @@
 <script>
 const SUPABASE_URL  = 'https://bnqvcxwuqgbcvtvlpudt.supabase.co';
 const SUPABASE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJucXZjeHd1cWdiY3Z0dmxwdWR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5OTkzMjgsImV4cCI6MjA5MTU3NTMyOH0.e6AP3s1LTna1pcMxtS9AuPgElItmRJBlboUVoW6AHcY';
-const EVOLUTION_URL = 'http://evolution.testejk.store';
+const EVOLUTION_URL = 'https://evolution.testejk.store';
 const EVOLUTION_KEY = 'EF097AFB3511-465B-A40D-BCD9A955C317';
 const INSTANCE      = 'whats';
 const MARKUP        = 2.41;
 
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storageKey: 'guacu-pwa-auth' } });
 
 let currentTab = 'pendente';
 let allData    = { pendente: [], aprovado: [], reprovado: [] };
@@ -286,7 +288,7 @@ async function loadAll() {
   try {
     const data = await sbFetch(
       '/rest/v1/orcamentos?status=in.(pendente,aprovado,reprovado)' +
-      '&select=*,clientes(nome,telefone),itens_orcamento(quantidade,preco_unitario,produtos(nome,codigo))' +
+      '&select=*,clientes(nome,telefone),itens_orcamento(quantidade,preco_unitario,acabamento,produtos(nome,codigo))' +
       '&order=created_at.desc&limit=100'
     );
     allData = { pendente: [], aprovado: [], reprovado: [] };
@@ -317,6 +319,12 @@ function fmtDt(d)  { return new Date(d).toLocaleString('pt-BR', { day:'2-digit',
 function calcTotal(itens) {
   return itens.reduce((s, i) => s + parseFloat(i.preco_unitario) * MARKUP * parseInt(i.quantidade), 0);
 }
+function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
 
 function renderTab() {
   const list = allData[currentTab] || [];
@@ -328,6 +336,19 @@ function renderTab() {
     return;
   }
   el.innerHTML = list.map(o => renderCard(o)).join('');
+  // Bind action buttons via dataset (evita injeção no onclick inline)
+  el.querySelectorAll('button[data-action]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.id;
+      const o = (allData[currentTab] || []).find(x => x.id === id);
+      if (!o) return;
+      const numero = o.numero_orcamento || '';
+      const tel    = o.clientes?.telefone || '';
+      const nome   = o.clientes?.nome || '';
+      if (btn.dataset.action === 'aprovar')  aprovar(id, numero, tel, nome, btn);
+      else if (btn.dataset.action === 'reprovar') reprovar(id, numero, tel, nome, btn);
+    });
+  });
 }
 
 function renderCard(o) {
@@ -339,10 +360,12 @@ function renderCard(o) {
   const itensHtml = itens.map(i => {
     const p = parseFloat(i.preco_unitario) * MARKUP;
     const s = p * parseInt(i.quantidade);
+    const acab = i.acabamento ? `<div class="item-acab">Acabamento: <b>${escapeHtml(i.acabamento)}</b></div>` : '';
     return `<div class="item-row">
       <div class="item-info">
-        <div class="item-nome">${i.produtos?.nome || 'Produto'}</div>
-        <div class="item-qtd">Qtd: ${i.quantidade} × ${fmt(p)}</div>
+        <div class="item-nome">${escapeHtml(i.produtos?.nome || 'Produto')}</div>
+        ${acab}
+        <div class="item-qtd">Qtd: ${escapeHtml(i.quantidade)} × ${fmt(p)}</div>
       </div>
       <div class="item-val">${fmt(s)}</div>
     </div>`;
@@ -350,20 +373,20 @@ function renderCard(o) {
 
   const actions = currentTab === 'pendente' ? `
     <div class="actions">
-      <button class="btn btn-aprovar"  onclick="aprovar('${o.id}','${o.numero_orcamento}','${tel}','${nome}',this)">✅ Aprovar</button>
-      <button class="btn btn-reprovar" onclick="reprovar('${o.id}','${o.numero_orcamento}','${tel}','${nome}',this)">❌ Reprovar</button>
+      <button class="btn btn-aprovar"  data-action="aprovar"  data-id="${escapeHtml(o.id)}">✅ Aprovar</button>
+      <button class="btn btn-reprovar" data-action="reprovar" data-id="${escapeHtml(o.id)}">❌ Reprovar</button>
     </div>` : '';
 
-  return `<div class="card" id="card-${o.id}">
+  return `<div class="card" id="card-${escapeHtml(o.id)}">
     <div class="card-header">
       <div>
-        <div class="numero">${o.numero_orcamento || o.id.substring(0,8)}</div>
+        <div class="numero">${escapeHtml(o.numero_orcamento || o.id.substring(0,8))}</div>
         <div class="data-hora">${fmtDt(o.created_at)}</div>
       </div>
-      <span class="badge badge-${o.status}">${o.status}</span>
+      <span class="badge badge-${escapeHtml(o.status)}">${escapeHtml(o.status)}</span>
     </div>
-    <div class="cliente-nome">${nome}</div>
-    <div class="cliente-tel">📱 ${tel}</div>
+    <div class="cliente-nome">${escapeHtml(nome)}</div>
+    <div class="cliente-tel">📱 ${escapeHtml(tel)}</div>
     <div class="itens">
       ${itensHtml}
       <div class="total-row"><span>Total</span><span class="total-val">${fmt(total)}</span></div>
@@ -391,7 +414,8 @@ async function aprovar(id, numero, tel, nome, btn) {
     itens.forEach(i => {
       const p = parseFloat(i.preco_unitario) * MARKUP;
       const s = p * parseInt(i.quantidade);
-      linhas.push(`• ${i.produtos?.nome} (${i.produtos?.codigo || ''})`);
+      const acab = i.acabamento ? ` — Acabamento: ${i.acabamento}` : '';
+      linhas.push(`• ${i.produtos?.nome} (${i.produtos?.codigo || ''})${acab}`);
       linhas.push(`  ${i.quantidade}x ${fmt(p)} = *${fmt(s)}*`);
     });
     linhas.push('─────────────────');
